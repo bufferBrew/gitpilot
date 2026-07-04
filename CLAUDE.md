@@ -1,0 +1,139 @@
+# CLAUDE.md — gitpilot
+
+Model-agnostic Java MCP server providing **git workflow tools** — branch
+creation, commits, commit message generation, and PR descriptions. Works
+on any git repo; operates on the current working directory by default.
+
+## Role
+
+gitpilot is a **git assistant** exposed as MCP tools. Claude Code
+(or any MCP client) can read git status, create feature branches, stage
+and commit changes, and generate conventional commit messages or PR
+descriptions — all through typed tool calls instead of shell commands.
+
+Two tiers of tools:
+
+| Tier | Tools | AI? | How |
+|---|---|---|---|
+| 1 — pure git | `gitStatus`, `gitCreateFeatureBranch`, `gitCommit`, `gitShowStagedChanges` | No | JGit (pure Java) |
+| 2 — AI-assisted | `gitGenerateCommitMessage`, `gitGeneratePrDescription` | Yes | Spring AI ChatClient — config-driven, model-agnostic |
+
+## Design principles
+
+1. **Model-agnostic.** No LLM provider hardcoded. AI tools use Spring AI's
+   `ChatClient`. Swap Anthropic → OpenAI → Ollama in `application.yml`.
+2. **Git-first.** Tier 1 tools are pure JGit — no AI, no API keys needed.
+   The server is useful even without an LLM provider configured.
+3. **MCP-native.** Tools are `@Tool`-annotated beans over stdio. The LLM
+   discovers and calls them; no shell commands, no prompt injection.
+4. **Safe by default.** All destructive operations (commit, branch create)
+   are explicit tools with required params. No silent force-pushes, no
+   history rewriting. The LLM must name what it's doing.
+
+## Tech stack
+
+- Java 21 + Spring Boot 3.4
+- Spring AI 1.0.4 (`spring-ai-mcp-server-spring-boot-starter`)
+- JGit 7.0 (`org.eclipse.jgit`) — pure Java git, no CLI dependency
+- Maven wrapper recommended: `mvnw` (run `mvn -N wrapper:wrapper` once)
+
+## Build / run (Windows)
+
+```powershell
+# No env vars required for tier 1 (pure git) tools.
+mvn spring-boot:run
+
+# For tier 2 (AI-assisted), add provider key:
+$env:ANTHROPIC_API_KEY = "sk-ant-..."
+mvn spring-boot:run
+```
+
+## Development workflow
+
+### Commit discipline
+
+```
+<type>: <short description>
+
+<body — optional, for non-obvious changes>
+
+Related: docs/<nn>-<Topic>.md
+Obsidian: gitpilot/<note>.md
+```
+
+Types: `feat`, `fix`, `docs`, `chore`, `refactor`.
+
+### Every change = code → docs → commit → merge to main
+
+1. **Code.** Make the change. One concern per commit.
+2. **Docs.** Update the relevant `docs/` file in the SAME commit.
+   - Architecture change → `docs/01-Architecture.md`
+   - New tool → `docs/03-MCP-Tool-Registry.md` + `docs/README.md`
+   - Config/env change → `README.md` setup section
+3. **Obsidian.** Mirror key changes to
+   `C:\Users\kartik\Documents\Obsidian Vault\gitpilot\` within the same
+   session. At minimum, update `project-status.md`.
+4. **Verify.** `mvn compile` must pass.
+5. **Commit.** Conventional commit. No amend, no `--no-verify` on main.
+6. **Merge.** Direct to `main` for solo work. Short-lived `feat/*` branches
+   for experiments, merged and deleted.
+
+### Branching
+
+- `main` — always green.
+- `feat/<name>` — short-lived, delete after merge.
+- No `develop`, no `release/`.
+
+## Project structure
+
+```
+gitpilot/
+├── pom.xml
+├── README.md
+├── CLAUDE.md                        ← this file
+├── docs/
+│   ├── README.md                    ← doc index
+│   ├── 01-Architecture.md           ← ecosystem fit, data flow
+│   ├── 02-Development.md            ← workflow, conventions, tool patterns
+│   ├── 03-MCP-Tool-Registry.md      ← catalog of all registered tools
+│   └── MCP-Creation-Guide.md        ← step-by-step MCP server guide (reference)
+├── src/main/java/com/gitpilot/agent/
+│   ├── GitpilotApplication.java   ← @SpringBootApplication
+│   ├── config/
+│   │   ├── GitConfig.java           ← @ConfigurationProperties("git")
+│   │   └── McpConfig.java           ← MCP transport hooks
+│   ├── repository/
+│   │   └── GitRepository.java       ← JGit operations (status, diff, branch, commit)
+│   └── tools/
+│       └── GitTools.java            ← @Tool-annotated MCP methods
+└── src/main/resources/
+    ├── application.yml              ← default config (env-var placeholders)
+    └── application-local.yml        ← local secrets (gitignored)
+```
+
+## Conventions
+
+- **GitRepository:** all JGit operations. Returns strings (formatted diffs,
+  status, commit hashes). No git CLI shelling out.
+- **GitTools:** @Tool methods that call GitRepository. Format output as
+  Markdown for LLM readability. Handle exceptions with clear error strings.
+- **AI tools:** inject `ChatClient` via constructor. System prompt defines the
+  role. User prompt passes structured context (diff, commit history). Always
+  have a fallback when the AI call fails.
+- **Config:** `git.repo-path` defaults to `user.dir`. Override with
+  `GIT_REPO_PATH` env var. Secrets from env vars, never from files.
+- **No codegen.** No Lombok, no MapStruct, no annotation processors beyond
+  Spring Boot's defaults.
+
+## Memory
+
+Project memory lives at
+`C:\Users\kartik\.claude\projects\C--Users-kartik-Desktop-code-gitpilot\memory\`.
+Update it after significant architectural decisions.
+
+## Obsidian
+
+This project is documented in Obsidian at:
+`C:\Users\kartik\Documents\Obsidian Vault\gitpilot\`
+
+Key notes mirror the docs/ files. Update both when something changes.

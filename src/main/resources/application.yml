@@ -1,0 +1,33 @@
+# =============================================================================
+# gitpilot — git workflow MCP server
+# Secrets / overrides go in application-local.yml (gitignored) or env vars.
+# =============================================================================
+
+spring:
+  application:
+    name: gitpilot
+
+  ai:
+    mcp:
+      server:
+        transport: stdio
+
+# ---------------------------------------------------------------------------
+# Git workspace: the repo to operate on.
+# Defaults to the current working directory (where the MCP client spawns).
+# Override with GIT_REPO_PATH env var to pin to a specific repo.
+# ---------------------------------------------------------------------------
+git:
+  repo-path: ${GIT_REPO_PATH:${user.dir}}
+
+# ---------------------------------------------------------------------------
+# AI provider config (for generate-commit-message, generate-pr-description).
+# Uncomment and configure when ready for the AI tier.
+# ---------------------------------------------------------------------------
+# spring:
+#   ai:
+#     anthropic:
+#       api-key: ${ANTHROPIC_API_KEY}
+#       chat:
+#         options:
+#           model: claude-opus-4-8

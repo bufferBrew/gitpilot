@@ -2,25 +2,22 @@ package com.gitpilot.agent.repository;
 
 import com.gitpilot.agent.config.GitConfig;
 import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.api.Status;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.diff.DiffFormatter;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.revwalk.RevCommit;
-import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
-import org.eclipse.jgit.util.io.DisabledOutputStream;
+import org.eclipse.jgit.treewalk.CanonicalTreeParser;
+import org.eclipse.jgit.treewalk.FileTreeIterator;
 import org.springframework.stereotype.Component;
 
 import java.io.ByteArrayOutputStream;
-import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 /**
  * All git operations via JGit — no CLI dependency.
@@ -33,6 +30,10 @@ public class GitRepository {
     public GitRepository(GitConfig config) {
         this.repoPath = Path.of(config.getRepoPath());
     }
+
+    /** Regex for valid git branch names (git-check-ref-format). */
+    private static final Pattern VALID_BRANCH = Pattern.compile(
+            "^(?![/.])(?!.*//)(?!.*\\.\\.)(?!.*[@\\{])[a-zA-Z0-9][a-zA-Z0-9._/-]*(?<![./])$");
 
     // ---- repo handle ----
 
@@ -52,10 +53,19 @@ public class GitRepository {
 
     /**
      * Current branch short name, e.g. "main" or "feat/my-branch".
+     * Returns "HEAD (no commits yet)" for a fresh repo.
      */
     public String currentBranch() throws IOException {
         try (var repo = openRepo()) {
-            return repo.getBranch();
+            if (repo.resolve("HEAD") == null) {
+                return "HEAD (no commits yet)";
+            }
+            var branch = repo.getBranch();
+            // On a fresh repo, getBranch() may return "HEAD" literally
+            if (branch == null || branch.equals("HEAD")) {
+                return "HEAD (no commits yet)";
+            }
+            return branch;
         }
     }
 
@@ -103,47 +113,83 @@ public class GitRepository {
 
     /**
      * Diff of staged changes (what would be committed).
+     * Diffs HEAD tree against the index (staging area).
      */
     public String stagedDiff() throws IOException {
-        try (var repo = openRepo();
-             var git = new Git(repo)) {
+        try (var repo = openRepo()) {
 
             var head = repo.resolve("HEAD");
             if (head == null) {
-                return "[no commits yet]";
+                return "[no commits yet — nothing to diff]";
             }
 
-            var indexDiff = git.diff()
-                    .setNewTree(repo.newObjectInserter().newParser().parseTree(
-                            repo.readDirCache().writeTree(repo.newObjectInserter())))
-                    .setOldTree(repo.parseCommit(head).getTree())
-                    .call();
+            var headCommit = repo.parseCommit(head);
+            var reader = repo.newObjectReader();
 
-            return formatDiff(repo, head, null);
-        } catch (GitAPIException e) {
-            throw new IOException("Failed to get staged diff: " + e.getMessage(), e);
+            // Parse HEAD tree
+            var oldTreeIter = new CanonicalTreeParser();
+            oldTreeIter.reset(reader, headCommit.getTree());
+
+            // Build index tree (staged state)
+            var inserter = repo.newObjectInserter();
+            var indexTreeId = repo.readDirCache().writeTree(inserter);
+            var newTreeIter = new CanonicalTreeParser();
+            newTreeIter.reset(reader, indexTreeId);
+
+            var out = new ByteArrayOutputStream();
+            try (var formatter = new DiffFormatter(out)) {
+                formatter.setRepository(repo);
+                formatter.format(oldTreeIter, newTreeIter);
+            }
+
+            var diff = out.toString();
+            if (diff.isBlank()) {
+                return "[no staged changes]";
+            }
+            if (diff.length() > 8000) {
+                diff = diff.substring(0, 8000) + "\n... [diff truncated at 8000 chars]";
+            }
+            return diff;
         }
     }
 
     /**
      * Diff of working-tree changes (unstaged).
+     * Uses DiffFormatter.scan() to compare index tree against the working tree.
      */
     public String unstagedDiff() throws IOException {
-        try (var repo = openRepo();
-             var git = new Git(repo)) {
+        try (var repo = openRepo()) {
 
-            var diffOut = new ByteArrayOutputStream();
-            try (var formatter = new DiffFormatter(diffOut)) {
+            var reader = repo.newObjectReader();
+
+            // Build index tree (staged state) as the "old" baseline
+            var inserter = repo.newObjectInserter();
+            var indexTreeId = repo.readDirCache().writeTree(inserter);
+            var indexTreeIter = new CanonicalTreeParser();
+            indexTreeIter.reset(reader, indexTreeId);
+
+            // FileTreeIterator represents the working tree
+            var workTreeIter = new FileTreeIterator(repo);
+
+            var out = new ByteArrayOutputStream();
+            try (var formatter = new DiffFormatter(out)) {
                 formatter.setRepository(repo);
-                var status = git.status().call();
-                for (String file : status.getUncommittedChanges()) {
-                    // diff the working tree vs index for each file
+                // scan() returns DiffEntry list; format() writes each entry's diff
+                var entries = formatter.scan(indexTreeIter, workTreeIter);
+                for (var entry : entries) {
+                    formatter.format(entry);
                 }
             }
-        } catch (GitAPIException e) {
-            throw new IOException("Failed to get unstaged diff: " + e.getMessage(), e);
+
+            var diff = out.toString();
+            if (diff.isBlank()) {
+                return "[no unstaged changes]";
+            }
+            if (diff.length() > 8000) {
+                diff = diff.substring(0, 8000) + "\n... [diff truncated at 8000 chars]";
+            }
+            return diff;
         }
-        return ""; // placeholder
     }
 
     /**
@@ -155,8 +201,21 @@ public class GitRepository {
 
             var status = git.status().call();
             var sb = new StringBuilder();
-            sb.append("Branch: ").append(currentBranch()).append("\n\n");
 
+            var branch = currentBranch();
+            sb.append("Branch: ").append(branch).append("\n");
+
+            if (repo.resolve("HEAD") == null) {
+                sb.append("(fresh repo — no commits yet)\n\n");
+                // Still show the file lists — they matter for the first commit
+                appendFileList(sb, "Files (will be in root commit)", status.getUntracked());
+                if (status.getUntracked().isEmpty()) {
+                    sb.append("No files yet. Make your first commit!\n");
+                }
+                return sb.toString();
+            }
+
+            sb.append("\n");
             appendFileList(sb, "Staged", status.getChanged());
             appendFileList(sb, "Modified (unstaged)", status.getModified());
             appendFileList(sb, "Untracked", status.getUntracked());
@@ -175,14 +234,21 @@ public class GitRepository {
 
     /**
      * Recent commit messages (default: last 10).
+     * Returns an empty list for a fresh repo with no commits.
      */
     public List<String> recentCommits(int count) throws IOException {
-        try (var repo = openRepo();
-             var git = new Git(repo)) {
-
+        try (var repo = openRepo()) {
+            if (repo.resolve("HEAD") == null) {
+                return List.of("[no commits yet]");
+            }
+        }
+        try (var git = openGit()) {
             var messages = new ArrayList<String>();
             for (var commit : git.log().setMaxCount(count).call()) {
                 messages.add(commit.getShortMessage());
+            }
+            if (messages.isEmpty()) {
+                return List.of("[no commits yet]");
             }
             return messages;
         } catch (GitAPIException e) {
@@ -194,9 +260,38 @@ public class GitRepository {
 
     /**
      * Create and switch to a new branch from the current HEAD.
+     *
+     * @throws IOException if the branch name is invalid or already exists
      */
     public String createBranch(String branchName) throws IOException {
+        // Validate branch name
+        if (branchName == null || branchName.isBlank()) {
+            throw new IOException("Branch name cannot be empty.");
+        }
+        if (branchName.startsWith("/") || branchName.endsWith("/")) {
+            throw new IOException("Branch name cannot start or end with '/'.");
+        }
+        if (branchName.contains("..")) {
+            throw new IOException("Branch name cannot contain '..'.");
+        }
+        if (branchName.contains(" ")) {
+            throw new IOException("Branch name cannot contain spaces.");
+        }
+        if (!VALID_BRANCH.matcher(branchName).matches()) {
+            throw new IOException("Invalid branch name '" + branchName
+                    + "'. Use letters, digits, '/', '-', '_', and '.' only.");
+        }
+
         try (var git = openGit()) {
+            // Check if the branch already exists
+            var existing = git.branchList().call();
+            for (var ref : existing) {
+                var shortName = ref.getName().replace("refs/heads/", "");
+                if (shortName.equals(branchName)) {
+                    throw new IOException("Branch '" + branchName + "' already exists.");
+                }
+            }
+
             git.branchCreate()
                     .setName(branchName)
                     .call();
@@ -211,11 +306,21 @@ public class GitRepository {
 
     /**
      * Stage all files and commit with the given message.
+     *
+     * @throws IOException if nothing to commit or the commit fails
      */
     public String commit(String message) throws IOException {
         try (var git = openGit()) {
             // Stage everything (git add -A)
             git.add().addFilepattern(".").call();
+
+            // Verify there's something staged before attempting commit
+            var status = git.status().call();
+            if (status.getChanged().isEmpty()
+                    && status.getAdded().isEmpty()
+                    && status.getRemoved().isEmpty()) {
+                throw new IOException("Nothing to commit — working tree is clean.");
+            }
 
             var commit = git.commit()
                     .setMessage(message)

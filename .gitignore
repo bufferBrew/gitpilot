@@ -1,6 +1,8 @@
-# Maven
-target/
+# Gradle
+build/
+.gradle/
 *.jar
+!gradle/wrapper/gradle-wrapper.jar
 
 # Local overrides
 application-local.yml

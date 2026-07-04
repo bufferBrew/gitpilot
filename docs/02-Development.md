@@ -49,7 +49,7 @@ Update docs in the **same commit** as the code change.
 ### 3. Verify
 
 ```powershell
-mvn compile          # must pass — zero errors
+./gradlew compileJava          # must pass — zero errors
 ```
 
 ### 4. Commit
@@ -157,7 +157,7 @@ public class GitRepository {
 - [ ] `@ToolParam` on every parameter with a `description`
 - [ ] Sensible default for optional params (null check)
 - [ ] Exception handling — catch and return error string, never throw
-- [ ] `mvn compile` passes
+- [ ] `./gradlew compileJava` passes
 - [ ] Entry in `docs/03-MCP-Tool-Registry.md`
 - [ ] `docs/README.md` status updated
 - [ ] Commit with `feat:` prefix

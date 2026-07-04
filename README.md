@@ -38,21 +38,21 @@ Claude Code / MCP Client
 ### Prerequisites
 
 - Java 21+
-- Maven 3.9+
 - A git repo (defaults to CWD; override with `GIT_REPO_PATH`)
+- Gradle wrapper (`./gradlew`) — IntelliJ generates it on project open
 
 ### Run (tier 1 — no API keys needed)
 
 ```powershell
 cd gitpilot
-mvn spring-boot:run
+./gradlew bootRun
 ```
 
 ### Run (tier 2 — with AI provider)
 
 ```powershell
 $env:ANTHROPIC_API_KEY = "sk-ant-..."
-mvn spring-boot:run
+./gradlew bootRun
 ```
 
 The server starts and listens on stdio for MCP JSON-RPC messages.
@@ -63,8 +63,8 @@ The server starts and listens on stdio for MCP JSON-RPC messages.
 {
   "mcpServers": {
     "gitpilot": {
-      "command": "mvn",
-      "args": ["-f", "C:\\Users\\kartik\\Desktop\\code\\gitpilot", "spring-boot:run"],
+      "command": "cmd",
+      "args": ["/c", "C:\\Users\\kartik\\Desktop\\code\\gitpilot\\gradlew.bat", "bootRun"],
       "env": {
         "GIT_REPO_PATH": "C:\\Users\\kartik\\Desktop\\code\\ai_dashboard"
       }
@@ -88,7 +88,7 @@ See [docs/01-Architecture.md](docs/01-Architecture.md) for the full picture.
 See [CLAUDE.md](CLAUDE.md) for full conventions and workflow.
 
 ```powershell
-mvn compile     # build check
+./gradlew compileJava     # build check
 ```
 
 ## License

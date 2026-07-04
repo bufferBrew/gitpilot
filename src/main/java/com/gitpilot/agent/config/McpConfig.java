@@ -1,21 +1,22 @@
 package com.gitpilot.agent.config;
 
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * MCP server configuration.
+ * MCP server configuration hook.
  * <p>
- * The {@code spring-ai-mcp-server-spring-boot-starter} auto-configures the
- * stdio transport and registers {@code @Tool} beans. This class is a hook
- * for any additional MCP plumbing (custom converters, interceptors, etc.)
- * you may need later.
+ * The {@code spring-ai-mcp-server-spring-boot-starter} auto-configures
+ * the stdio transport and discovers all {@code @Tool} beans. This class
+ * exists as a hook for manual MCP plumbing — custom tool call interceptors,
+ * error handlers, or transport-level settings — when the defaults are not
+ * sufficient.
  * <p>
- * For now it's intentionally empty — the auto-configuration handles everything.
+ * Intentionally empty at present. The auto-configuration handles tool
+ * registration, JSON-RPC framing, and stdio transport automatically.
+ *
+ * @author bufferbrew
+ * @since 0.2.0
  */
 @Configuration
 public class McpConfig {
-
-    // Future: add McpServerFeatures.SyncServerSpec customizations here.
-    // Spring AI auto-config creates the server from all @Tool beans.
 }

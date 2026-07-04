@@ -21,6 +21,18 @@ import java.util.regex.Pattern;
 
 /**
  * All git operations via JGit — no CLI dependency.
+ * <p>
+ * Handles reading (status, diff, log) and writing (branch, commit) against
+ * a local git repository. Every method opens and closes its own repo handle
+ * via try-with-resources — no shared state, no stale handles.
+ * <p>
+ * Methods that detect error states (fresh repo, clean tree, invalid input)
+ * return descriptive strings like {@code "[no commits yet]"} rather than
+ * throwing — the tool layer can check for these brackets to decide what to
+ * surface to the user.
+ *
+ * @author bufferbrew
+ * @since 0.2.0
  */
 @Component
 public class GitRepository {

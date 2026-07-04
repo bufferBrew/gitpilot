@@ -6,15 +6,27 @@ import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.stereotype.Component;
 
 /**
- * MCP tools for git workflow — branches, commits, PR descriptions.
+ * MCP tools for git workflow — branches, commits, commit messages, and
+ * PR descriptions.
  * <p>
- * Three tiers:
+ * Two tiers of tools:
  * <ol>
- *   <li><b>Pure git</b> — status, create branch, commit (no AI)</li>
- *   <li><b>AI-assisted</b> — generate commit messages, generate PR
- *       descriptions (ChatClient, provider from config)</li>
+ *   <li><b>Tier 1 — pure git</b> — {@code gitStatus}, {@code gitCreateFeatureBranch},
+ *       {@code gitCommit}, {@code gitShowStagedChanges}. Zero API keys needed.
+ *       All operations via JGit.</li>
+ *   <li><b>Tier 2 — AI-assisted</b> — {@code gitGenerateCommitMessage},
+ *       {@code gitGeneratePrDescription}. Uses Spring AI {@code ChatClient}
+ *       (provider configured in {@code application.yml}, model-agnostic).</li>
  * </ol>
- * AI tools are skipped for now — scaffold only. Start with pure git.
+ * <p>
+ * Every tool catches exceptions and returns a clear error string — never
+ * a raw stack trace. Output is formatted as Markdown for LLM readability.
+ * <p>
+ * Tier 2 tools are currently scaffold stubs. They return context + a
+ * placeholder note. Wire {@code ChatClient} to activate AI generation.
+ *
+ * @author bufferbrew
+ * @since 0.2.0
  */
 @Component
 public class GitTools {

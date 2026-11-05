@@ -1,22 +1,17 @@
 package com.gitpilot.agent.config;
 
+import com.gitpilot.agent.tools.GitTools;
+import org.springframework.ai.tool.ToolCallbackProvider;
+import org.springframework.ai.tool.method.MethodToolCallbackProvider;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-/**
- * MCP server configuration hook.
- * <p>
- * The {@code spring-ai-mcp-server-spring-boot-starter} auto-configures
- * the stdio transport and discovers all {@code @Tool} beans. This class
- * exists as a hook for manual MCP plumbing — custom tool call interceptors,
- * error handlers, or transport-level settings — when the defaults are not
- * sufficient.
- * <p>
- * Intentionally empty at present. The auto-configuration handles tool
- * registration, JSON-RPC framing, and stdio transport automatically.
- *
- * @author bufferbrew
- * @since 0.2.0
- */
+/** Registers the annotated git tools with Spring AI's MCP server. */
 @Configuration
 public class McpConfig {
+
+    @Bean
+    public ToolCallbackProvider gitToolCallbacks(GitTools gitTools) {
+        return MethodToolCallbackProvider.builder().toolObjects(gitTools).build();
+    }
 }

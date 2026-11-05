@@ -184,3 +184,11 @@ After every change, update the Obsidian vault at
 
 Vault notes can be looser than docs/ — they're for thinking, not just
 reference. Use Obsidian links (`[[note-name]]`) to connect ideas.
+
+## Verified local build (2026-11-05)
+
+The Gradle wrapper is included. Run `./gradlew test bootJar` with a supported Gradle JVM (Java 17 or 21) and the Java 21 toolchain. The build uses `spring-ai-starter-mcp-server` from the existing Spring AI 1.0.4 BOM and the published JGit 7.0.0.202409031743-r release.
+
+`McpConfig` registers the six annotated methods through a `ToolCallbackProvider`. STDIO is explicitly enabled; the Spring banner is disabled and Logback writes to stderr so stdout contains only MCP JSON-RPC. `McpConfigTest` verifies the six tool callbacks are registered in the application context. The two AI generation methods remain the existing scaffold implementations; no LLM calls are made by these checks.
+
+References: [Spring AI 1.0 MCP starter](https://docs.spring.io/spring-ai/reference/1.0/api/mcp/mcp-server-boot-starter-docs.html), [JGit 7.0 release](https://www.eclipse.org/lists/jgit-dev/msg04289.html).

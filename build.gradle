@@ -20,12 +20,12 @@ repositories {
 
 ext {
     springAiVersion = '1.0.4'
-    jgitVersion = '7.0.0.202411191551-r'
+    jgitVersion = '7.0.0.202409031743-r'
 }
 
 dependencies {
     // Spring AI MCP server — stdio transport, @Tool discovery
-    implementation "org.springframework.ai:spring-ai-mcp-server-spring-boot-starter"
+    implementation "org.springframework.ai:spring-ai-starter-mcp-server"
 
     // JGit — pure Java git operations
     implementation "org.eclipse.jgit:org.eclipse.jgit:${jgitVersion}"

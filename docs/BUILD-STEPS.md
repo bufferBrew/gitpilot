@@ -11,7 +11,7 @@
 
 You need a Spring Boot 3.4 project with two special dependencies:
 
-- `spring-ai-mcp-server-spring-boot-starter` — this is the magic. It auto-discovers your `@Tool` methods and exposes them as an MCP server over stdio. Without it, you'd have to hand-write JSON-RPC framing.
+- `spring-ai-starter-mcp-server` — this is the magic. It auto-discovers your `@Tool` methods and exposes them as an MCP server over stdio. Without it, you'd have to hand-write JSON-RPC framing.
 
 - `org.eclipse.jgit` — pure Java git. No shelling out to `git.exe`. Works identically on Windows, Mac, and Linux.
 

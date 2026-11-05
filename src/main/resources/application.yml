@@ -4,13 +4,17 @@
 # =============================================================================
 
 spring:
+  main:
+    banner-mode: off
+
   application:
     name: gitpilot
 
   ai:
     mcp:
       server:
-        transport: stdio
+        stdio: true
+        name: gitpilot
 
 # ---------------------------------------------------------------------------
 # Git workspace: the repo to operate on.
